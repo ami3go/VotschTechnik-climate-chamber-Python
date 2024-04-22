@@ -268,7 +268,7 @@ class ClimateChamber:
 	@property
 	def temperature_measured(self):
 		"""Returns the measured temperature as a float number in Celsius."""
-		return float(self.query('GET CONTROL_VARIABLE ACTUAL_VALUE', 1)[0])
+		return round(float(self.query('GET CONTROL_VARIABLE ACTUAL_VALUE', 1)[0]),2)
 	
 	@property
 	def temperature_set_point(self):
