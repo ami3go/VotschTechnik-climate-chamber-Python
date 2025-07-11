@@ -1,5 +1,6 @@
 import socket
 from threading import RLock
+from colorama import Fore, Back, Style
 import time
 
 # The manuals with the documentation are really hard (or impossible) to
@@ -15,6 +16,31 @@ import time
 # [1] https://github.com/IzaakWN/ClimateChamberMonitor/blob/858ca67f8fbf2f89cf5b2d85955ca76395e694f4/chamber_commands.py
 # [2] Operation manual, Communication protocol S!MPAC® simserv, file named "SIMPAC_SimServ_en_2019.05_64636625_new.pdf". I could not find this document on Internet.
 # [3] Untitled document, http://lampx.tugraz.at/~hadley/semi/ch9/instruments/VT4002/Simpati_Simserv_Manual_(en).pdf
+
+##
+## Support functions
+##
+
+def range_check(val, min, max, val_name):
+    if val > max:
+        print(f"Wrong {val_name}: {val}. Max value should be < {max}")
+        val = max
+    if val < min:
+        print(f"Wrong {val_name}: {val}. Should be >= {min}")
+        val = min
+    return val
+
+
+def check_tolerance(value, target, tolerance=0.1):
+    return target - tolerance <= value <= target + tolerance
+
+
+def get_time():
+    t = datetime.datetime.now()
+    return f"{t.hour}:{t.minute}:{t.second}"
+
+
+
 
 def _generate_list_of_all_possible_commands(dictionary):
 	"""This function is for internal usage only. The argument <dictionary>
@@ -209,7 +235,7 @@ def translate_command_name_to_command_number(command_name: str):
 	return str(command_number)
 
 class ClimateChamber:
-	def __init__(self, ip: str, temperature_min: float, temperature_max: float, timeout=1):
+	def __init__(self, ip: str, temperature_min: float, temperature_max: float, timeout=1, temp_round = 2):
 		"""Creates an object of class ClimateChamber and starts the network connection to use it.
 		- ip: string, IP address of the climate chamber to control.
 		- temperature_min: float, minimum value of temperature to use. This is required for safety reasons to avoid accidentaly setting a temperature outside of this limit. This protection is implemented in this class, it does not touches anything into the climate chamber. If you use the methods provided by this class to control the temperature, everything should be fine. You can also set limits manually in the chamber itself using the control pannel.
@@ -218,6 +244,7 @@ class ClimateChamber:
 		_validate_float(temperature_max, 'temperature_max')
 		self._temperature_min = float(temperature_min)
 		self._temperature_max = float(temperature_max)
+		self._temp_round = int(temp_round)
 		_validate_type(ip, 'ip', str)
 		self._communication_lock = RLock() # To make a thread safe implementation.
 		with self._communication_lock:
@@ -270,7 +297,7 @@ class ClimateChamber:
 	@property
 	def temperature_measured(self):
 		"""Returns the measured temperature as a float number in Celsius."""
-		return round(float(self.query('GET CONTROL_VARIABLE ACTUAL_VALUE', 1)[0]),2)
+		return round(float(self.query('GET CONTROL_VARIABLE ACTUAL_VALUE', 1)[0]),self._temp_round)
 	
 
 	@property
@@ -287,6 +314,7 @@ class ClimateChamber:
 			raise ValueError(f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. These limits allow to set the temperature between {self._temperature_min} and {self._temperature_max} °C.')
 		else:
 			self.query('SET CONTROL_VARIABLE SET_POINT', 1, str(celsius)) # This is based in an example for setting the temperature from [2] § 3.2.
+			self.start()
 
 
 	@property
@@ -358,14 +386,16 @@ class ClimateChamber:
 	
 	def start(self):
 		"""Starts the climate chamber."""
-		self.query('START MANUAL_MODE', 1, 1)
-		time.sleep(1)
+		if self.is_running == False:
+			self.query('START MANUAL_MODE', 1, 1)
+			time.sleep(1)
 		
 	
 	def stop(self):
 		"""Stops the climate chamber."""
-		self.query('START MANUAL_MODE', 1, 0)
-		time.sleep(1)
+		if self.is_running == True:
+			self.query('START MANUAL_MODE', 1, 0)
+			time.sleep(1)
 	
 	@property
 	def is_running(self):
@@ -378,9 +408,40 @@ class ClimateChamber:
 		else:
 			raise RuntimeError(f'Queried the climate chamber to see if it was running, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
 
+	def set_and_wait(self, tset=25, wait_after_min=0):
+		# set chamber to target temperatures
+		self.temperature_set_point = tset
+		self.start()
+
+		# wait while temperature inside get equal to target value
+		wait_for_target_temp = True  # variable to store status whether we reach target temperature
+		wait_period = 10  # seconds,  period of checking temperature and print message
+		while wait_for_target_temp == True:
+			temp_current = round(self.temperature_measured, 2)  # read current temperature
+			if check_tolerance(temp_current, tset, 0.8):
+				print(f"{Fore.BLUE}{get_time()} Current temperature is "
+					  f"{temp_current} C, "
+					  f"target: {tset} C{Style.RESET_ALL}")
+				wait_for_target_temp = False
+			else:
+				print(f"{Fore.YELLOW}{get_time()} Current temperature is "
+					  f"{temp_current} C, "
+					  f"target: {tset} C{Style.RESET_ALL}")
+				time.sleep(wait_period)
+
+		# wait for thermal equilibrium
+		wait_cycle = int(wait_after_min)
+		if wait_after_min != 0:
+			for i in range(wait_cycle):
+				print(f"{Fore.GREEN}{get_time()} *** Dwell time: {wait_after_min - i} min, "
+					  f"Current Temperature: {round(self.temperature_measured, 2)} C{Style.RESET_ALL}")
+				time.sleep(60)
+		time.sleep((wait_after_min - wait_cycle) * 60)
+
 if __name__ == '__main__':
-	import time
 	
 	climate_chamber = ClimateChamber(ip = '130.60.165.218', temperature_min = -20, temperature_max = 20)
 	
 	print(climate_chamber.idn)
+	climate_chamber.set_and_wait(20, 1)
+	climate_chamber.stop()
