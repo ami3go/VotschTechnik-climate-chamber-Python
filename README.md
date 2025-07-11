@@ -9,7 +9,7 @@ in an easy way using Python.
 Option 1 (easy, black box, you just want to use this):
 
 ```
-pip3 install git+https://github.com/SengerM/VotschTechnik-climate-chamber-Python
+pip3 install git+https://github.com/ami3go/VotschTechnik-climate-chamber-Python
 ```
 
 Option 2 (still easy, allows you to change the code):
