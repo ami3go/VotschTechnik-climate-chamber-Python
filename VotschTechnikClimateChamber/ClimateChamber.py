@@ -255,6 +255,7 @@ class ClimateChamber:
 		"""Returns the "test system type" (model?)."""
 		return self.query('get chamber info', 1)[0]
 	
+
 	@property
 	def year_manufactured(self):
 		"""Returns the year manufactured as a string."""
@@ -265,15 +266,19 @@ class ClimateChamber:
 		"""Returns a string with information to identify the climate chamber."""
 		return f'Climate chamber vötschtechnik, {self.test_system_type}, serial N° {self.serial_number}, manufactured in {self.year_manufactured}'
 	
+
 	@property
 	def temperature_measured(self):
 		"""Returns the measured temperature as a float number in Celsius."""
 		return round(float(self.query('GET CONTROL_VARIABLE ACTUAL_VALUE', 1)[0]),2)
 	
+
 	@property
 	def temperature_set_point(self):
 		"""Returns the set temperature as a float number in Celsius."""
 		return float(self.query('GET CONTROL_VARIABLE SET_POINT', 1)[0])
+
+
 	@temperature_set_point.setter
 	def temperature_set_point(self, celsius: float):
 		"""Set the temperature in Celsius."""
@@ -282,11 +287,14 @@ class ClimateChamber:
 			raise ValueError(f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. These limits allow to set the temperature between {self._temperature_min} and {self._temperature_max} °C.')
 		else:
 			self.query('SET CONTROL_VARIABLE SET_POINT', 1, str(celsius)) # This is based in an example for setting the temperature from [2] § 3.2.
-	
+
+
 	@property
 	def temperature_min(self):
 		"""Returns the minimum temperature limit in Celsius as a float number."""
 		return self._temperature_min
+
+
 	@temperature_min.setter
 	def temperature_min(self, celsius: float):
 		"""Set the minimum temperature limit in Celsius."""
@@ -297,12 +305,15 @@ class ClimateChamber:
 	def temperature_max(self):
 		"""Returns the maximum temperature limit in Celsius as a float number."""
 		return self._temperature_max
+
+
 	@temperature_max.setter
 	def temperature_max(self, celsius: float):
 		"""Set the maximum temperature limit in Celsius."""
 		_validate_float(celsius, 'celsius')
 		self._temperature_max = float(celsius)
-	
+
+
 	@property
 	def dryer(self):
 		"""Returns either `True` or `False` depending on whether the status of the dryer is on or off."""
@@ -313,6 +324,8 @@ class ClimateChamber:
 			return True
 		else:
 			raise RuntimeError(f'Queried for dryer status to the climate chamber, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+
+
 	@dryer.setter
 	def dryer(self, status: bool):
 		"""Turns on or off the dryer if status is True or False respectively."""
@@ -321,6 +334,8 @@ class ClimateChamber:
 		self.query('SET DIGITAL_OUT VALUE', 8, 1 if status==True else 0)
 		time.sleep(1)
 	
+
+
 	@property
 	def compressed_air(self):
 		"""Returns either `True` or `False` depending on whether the status of the compressed air is on or off."""
@@ -331,6 +346,8 @@ class ClimateChamber:
 			return True
 		else:
 			raise RuntimeError(f'Queried for compressed air status to the climate chamber, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+
+
 	@compressed_air.setter
 	def compressed_air(self, status: bool):
 		"""Turns on or off the compressed air if status is True or False respectively."""
