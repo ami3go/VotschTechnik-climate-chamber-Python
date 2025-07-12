@@ -18,14 +18,7 @@ setuptools.setup(
     },
     packages=setuptools.find_packages(),  # Removed src/ reference
     python_requires=">=3.7",
-    install_requires=[
-        "pyserial>=3.5",
-        "numpy>=1.19.0",
-    ],
-    extras_require={
-        "gui": ["pyqt5>=5.15.0"],
-        "test": ["pytest>=6.0", "pytest-cov>=2.0"],
-    },
+
     entry_points={
         "console_scripts": [
             "votsch-cli=VotschTechnikClimateChamber.cli:main",
