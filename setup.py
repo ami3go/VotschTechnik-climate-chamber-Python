@@ -5,9 +5,9 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="VotschTechnikClimateChamber",
-    version="0.1.0",
-    author="Matias H. Senger",
-    author_email="m.senger@hotmail.com",
+    version="0.2.0",
+    author="Original: Matias H. Senger, Fork: A. Chasnyk",
+    author_email="Original:m.senger@hotmail.com, Fork: alexandr.chansyk@gmai.com",
     description="Python interface for Vötsch/Weiss Technik climate chambers with LabEvent controllers",
     long_description=long_description,
     long_description_content_type="text/markdown",
