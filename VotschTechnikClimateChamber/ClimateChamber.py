@@ -252,7 +252,12 @@ class ClimateChamber:
 			self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			self.socket.connect((ip, 2049)) # According to [2] § 2.2 this is the port, always.
 			self.socket.settimeout(timeout)
-	
+
+
+	def disconnect(self):
+		self.socket.close()
+
+
 	def query_command_low_level(self, command_number, *arguments):
 		"""Given the command number and the arguments, the command string is created and sent to the climate chamber. The response from the chamber to that command is returned without any processing."""
 		string_to_send = create_command_string(str(command_number), *arguments)
