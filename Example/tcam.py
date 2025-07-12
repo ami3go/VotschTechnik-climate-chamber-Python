@@ -42,6 +42,7 @@ def get_temperature():
 def get_set_point():
     return round(chamber.temperature_set_point, 2)
 
+
 def set_temperature(tset):
     # set chamber to target temperatures
     tset = range_check(tset, chamber.temperature_min, chamber.temperature_max, "Set temperature")

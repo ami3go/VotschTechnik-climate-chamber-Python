@@ -2,6 +2,7 @@ import socket
 from threading import RLock
 from colorama import Fore, Back, Style
 import time
+import datetime
 
 # The manuals with the documentation are really hard (or impossible) to
 # find using Google. My code is based in Izaak's code [1]. He sent me 
@@ -440,8 +441,7 @@ class ClimateChamber:
 
 if __name__ == '__main__':
 	
-	climate_chamber = ClimateChamber(ip = '130.60.165.218', temperature_min = -20, temperature_max = 20)
-	
+	climate_chamber = ClimateChamber(ip = 'localhost', temperature_min = -20, temperature_max = 20)
 	print(climate_chamber.idn)
 	climate_chamber.set_and_wait(20, 1)
 	climate_chamber.stop()
