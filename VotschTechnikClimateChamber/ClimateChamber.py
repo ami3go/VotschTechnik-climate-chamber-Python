@@ -274,6 +274,7 @@ class ClimateChamber:
 	def temperature_set_point(self):
 		"""Returns the set temperature as a float number in Celsius."""
 		return float(self.query('GET CONTROL_VARIABLE SET_POINT', 1)[0])
+
 	@temperature_set_point.setter
 	def temperature_set_point(self, celsius: float):
 		"""Set the temperature in Celsius."""
@@ -297,6 +298,7 @@ class ClimateChamber:
 	def temperature_max(self):
 		"""Returns the maximum temperature limit in Celsius as a float number."""
 		return self._temperature_max
+
 	@temperature_max.setter
 	def temperature_max(self, celsius: float):
 		"""Set the maximum temperature limit in Celsius."""
@@ -313,6 +315,7 @@ class ClimateChamber:
 			return True
 		else:
 			raise RuntimeError(f'Queried for dryer status to the climate chamber, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+
 	@dryer.setter
 	def dryer(self, status: bool):
 		"""Turns on or off the dryer if status is True or False respectively."""
@@ -331,6 +334,7 @@ class ClimateChamber:
 			return True
 		else:
 			raise RuntimeError(f'Queried for compressed air status to the climate chamber, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+
 	@compressed_air.setter
 	def compressed_air(self, status: bool):
 		"""Turns on or off the compressed air if status is True or False respectively."""
@@ -364,6 +368,6 @@ class ClimateChamber:
 if __name__ == '__main__':
 	import time
 	
-	climate_chamber = ClimateChamber(ip = '130.60.165.218', temperature_min = -20, temperature_max = 20)
+	climate_chamber = ClimateChamber(ip='130.60.165.218', temperature_min=-20, temperature_max=20)
 	
 	print(climate_chamber.idn)
