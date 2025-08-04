@@ -264,7 +264,12 @@ class ClimateChamber:
 	def idn(self):
 		"""Returns a string with information to identify the climate chamber."""
 		return f'Climate chamber vötschtechnik, {self.test_system_type}, serial N° {self.serial_number}, manufactured in {self.year_manufactured}'
-	
+
+	@property
+	def id(self):
+		"""Returns a string with information to identify the climate chamber."""
+		return f'{self.test_system_type} SN:{self.serial_number}-{self.year_manufactured}'
+
 	@property
 	def temperature_measured(self):
 		"""Returns the measured temperature as a float number in Celsius."""
@@ -368,6 +373,8 @@ class ClimateChamber:
 if __name__ == '__main__':
 	import time
 	
-	climate_chamber = ClimateChamber(ip='130.60.165.218', temperature_min=-20, temperature_max=20)
+	climate_chamber = ClimateChamber("192.168.0.11", -40, 120)
 	
 	print(climate_chamber.idn)
+	print(climate_chamber.temperature_set_point)
+	# climate_chamber.stop()
