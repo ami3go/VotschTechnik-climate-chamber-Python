@@ -298,7 +298,11 @@ class ClimateChamber:
 	def idn(self):
 		"""Returns a string with information to identify the climate chamber."""
 		return f'Climate chamber vötschtechnik, {self.test_system_type}, serial N° {self.serial_number}, manufactured in {self.year_manufactured}'
-	
+
+	@property
+	def id(self):
+		"""Returns a string with information to identify the climate chamber."""
+		return f'{self.test_system_type} SN:{self.serial_number}-{self.year_manufactured}'
 
 	@property
 	def temperature_measured(self):
