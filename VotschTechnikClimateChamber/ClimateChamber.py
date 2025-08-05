@@ -15,6 +15,8 @@ import time
 # [1] https://github.com/IzaakWN/ClimateChamberMonitor/blob/858ca67f8fbf2f89cf5b2d85955ca76395e694f4/chamber_commands.py
 # [2] Operation manual, Communication protocol S!MPAC® simserv, file named "SIMPAC_SimServ_en_2019.05_64636625_new.pdf". I could not find this document on Internet.
 # [3] Untitled document, http://lampx.tugraz.at/~hadley/semi/ch9/instruments/VT4002/Simpati_Simserv_Manual_(en).pdf
+# [4] Installation and Operation Manual - page 230 command table http://weiss-na.com/wp-content/uploads/Simpati_4.50_user_guide.pdf
+
 
 def _generate_list_of_all_possible_commands(dictionary):
 	"""This function is for internal usage only. The argument <dictionary>
@@ -369,6 +371,45 @@ class ClimateChamber:
 			return True
 		else:
 			raise RuntimeError(f'Queried the climate chamber to see if it was running, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+
+
+	@property
+	def gradient_up(self):
+		return float(self.query('GET GRADIENT_UP VALUE', 1)[0])
+
+
+	@gradient_up.setter
+	def gradient_up(self, celsius: float):
+		"""Set the temperature in Celsius."""
+		_validate_float(celsius, 'celsius')
+		min_val = 0.01
+		max_val = 5
+		if not min_val <= celsius <= max_val:
+			raise ValueError(
+				f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. '
+				f'These limits allow to set the temperature between {min_val} and {max_val} °C.')
+		else:
+			self.query('SET GRADIENT_UP VALUE', 1,
+					   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
+
+	@property
+	def gradient_down(self):
+		return float(self.query('GET GRADIENT_DOWN VALUE', 1)[0])
+
+	@gradient_down.setter
+	def gradient_down(self, celsius: float):
+		"""Set the temperature in Celsius."""
+		_validate_float(celsius, 'celsius')
+		min_val = 0.01
+		max_val = 3.5
+		if not min_val <= celsius <= max_val:
+			raise ValueError(
+				f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. '
+				f'These limits allow to set the temperature between {min_val} and {max_val} °C.')
+		else:
+			self.query('SET GRADIENT_DOWN VALUE', 1,
+					   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
+
 
 if __name__ == '__main__':
 	import time
