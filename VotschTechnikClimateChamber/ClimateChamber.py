@@ -320,7 +320,6 @@ class ClimateChamber:
 			raise ValueError(f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. These limits allow to set the temperature between {self._temperature_min} and {self._temperature_max} °C.')
 		else:
 			self.query('SET CONTROL_VARIABLE SET_POINT', 1, str(celsius)) # This is based in an example for setting the temperature from [2] § 3.2.
-			self.start()
 
 
 	@property
