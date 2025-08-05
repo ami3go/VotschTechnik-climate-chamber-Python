@@ -414,6 +414,42 @@ class ClimateChamber:
 		else:
 			raise RuntimeError(f'Queried the climate chamber to see if it was running, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
 
+	@property
+	def gradient_up(self):
+		return float(self.query('GET GRADIENT_UP VALUE', 1)[0])
+
+	@gradient_up.setter
+	def gradient_up(self, celsius: float):
+		"""Set the temperature in Celsius."""
+		_validate_float(celsius, 'celsius')
+		min_val = 0.01
+		max_val = 5
+		if not min_val <= celsius <= max_val:
+			raise ValueError(
+				f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. '
+				f'These limits allow to set the temperature between {min_val} and {max_val} °C.')
+		else:
+			self.query('SET GRADIENT_UP VALUE', 1,
+					   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
+
+	@property
+	def gradient_down(self):
+		return float(self.query('GET GRADIENT_DOWN VALUE', 1)[0])
+
+	@gradient_down.setter
+	def gradient_down(self, celsius: float):
+		"""Set the temperature in Celsius."""
+		_validate_float(celsius, 'celsius')
+		min_val = 0.01
+		max_val = 3.5
+		if not min_val <= celsius <= max_val:
+			raise ValueError(
+				f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. '
+				f'These limits allow to set the temperature between {min_val} and {max_val} °C.')
+		else:
+			self.query('SET GRADIENT_DOWN VALUE', 1,
+					   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
+
 	def set_and_wait(self, tset=25, wait_after_min=0):
 		# set chamber to target temperatures
 		self.temperature_set_point = tset
