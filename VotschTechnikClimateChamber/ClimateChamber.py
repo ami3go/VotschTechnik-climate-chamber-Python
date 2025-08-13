@@ -407,8 +407,8 @@ class ClimateChamber:
 				f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. '
 				f'These limits allow to set the temperature between {min_val} and {max_val} °C.')
 		else:
-			self.query('SET GRADIENT_DOWN VALUE', 1,
-					   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
+			self.query('SET GRADIENT_DOWN VALUE', 1,str(celsius))
+
 
 
 if __name__ == '__main__':
@@ -418,4 +418,8 @@ if __name__ == '__main__':
 	
 	print(climate_chamber.idn)
 	print(climate_chamber.temperature_set_point)
+	climate_chamber.gradient_down = 3
+	climate_chamber.gradient_up = 5
+	print(climate_chamber.gradient_up)
+	print(climate_chamber.gradient_down)
 	# climate_chamber.stop()
