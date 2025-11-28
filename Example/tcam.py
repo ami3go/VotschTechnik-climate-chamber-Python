@@ -2,10 +2,10 @@ import time
 from VotschTechnikClimateChamber.ClimateChamber import ClimateChamber
 from colorama import Fore, Back, Style
 import datetime
-ip_1 = '192.168.0.21'
+ip_1 = '192.168.0.31'
 ip_2 = '192.168.0.11'
 chamber = ClimateChamber(
-        ip=ip_2,  # Use the IP address shown in the display of the climate chamber.
+        ip=ip_1,  # Use the IP address shown in the display of the climate chamber.
         temperature_min=-45,  # Minimum limit, will rise an error if try to set temperature lower than this.
         temperature_max=120,  # Maximum limit, will rise an error if try to set temperature higher than this.
     )
@@ -118,6 +118,6 @@ def stop():
     chamber.stop()
 
 if __name__ == "__main__":
-    set_and_wait(20)
+    # set_and_wait(20)
     print(get_temperature())
     stop()
