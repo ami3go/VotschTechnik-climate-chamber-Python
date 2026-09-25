@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "VotschTechnikClimateChamber"
+version = "0.2.0"
+description = "Python interface for Votsch/Weiss Technik climate chambers with LabEvent controllers"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Matias H. Senger", email = "m.senger@hotmail.com" },
+    { name = "A. Chasnyk" },
+]
+keywords = [
+    "climate chamber",
+    "environmental testing",
+    "LabEvent",
+    "Votsch",
+    "Weiss Technik",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Manufacturing",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
+]
+dependencies = [
+    "colorama>=0.4.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/ami3go/VotschTechnik-climate-chamber-Python"
+Issues = "https://github.com/ami3go/VotschTechnik-climate-chamber-Python/issues"
+
+[tool.setuptools.packages.find]
+include = ["VotschTechnikClimateChamber*"]
+

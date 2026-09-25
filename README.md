@@ -6,26 +6,32 @@ in an easy way using Python.
 
 ## Installation
 
-Option 1 (easy, black box, you just want to use this):
+Option 1 (install directly from GitHub):
 
+```bash
+python -m pip install git+https://github.com/ami3go/VotschTechnik-climate-chamber-Python.git
 ```
-pip3 install git+https://github.com/ami3go/VotschTechnik-climate-chamber-Python
+
+Option 2 (install a local checkout):
+
+```bash
+git clone https://github.com/ami3go/VotschTechnik-climate-chamber-Python.git
+cd VotschTechnik-climate-chamber-Python
+python -m pip install .
 ```
 
-Option 2 (still easy, allows you to change the code):
+For development, install the checkout in editable mode:
 
-Clone the repo wherever you want and then
-
-```
-pip3 install -e /wherever/you/wanted/to/clone/this/repo
+```bash
+python -m pip install -e .
 ```
 
 ### Uninstall
 
 To uninstall this package just run
 
-```
-pip3 uninstall VotschTechnikClimateChamber
+```bash
+python -m pip uninstall VotschTechnikClimateChamber
 ```
 
 ## Usage
@@ -33,7 +39,7 @@ pip3 uninstall VotschTechnikClimateChamber
 Just import and start using:
 
 ```Python
-from VotschTechnikClimateChamber.ClimateChamber import ClimateChamber
+from VotschTechnikClimateChamber import ClimateChamber
 
 chamber = ClimateChamber(
 	ip = '130.60.165.218', # Use the IP address shown in the display of the climate chamber.
@@ -49,4 +55,3 @@ print(f'The actual temperature in the chamber is {chamber.temperature_measured} 
 ## Reference
 
 Check the source code, specifically in [this file](VotschTechnikClimateChamber/ClimateChamber.py). If there is a specific method in the `ClimateChamber` class to do what you want, use it. Otherwise you will have to send the commands using the method `ClimateChamber.query`. The available commands are those in the `COMMANDS_DICT` which is defined in [the same file](VotschTechnikClimateChamber/ClimateChamber.py). If your command is not in `COMMANDS_DICT` you will have to use the method `ClimateChamber.query_command_low_level` and enter the command numbers manually, as stated in the user manual, which is a pain.
-

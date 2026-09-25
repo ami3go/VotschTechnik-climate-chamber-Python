@@ -1,44 +1,10 @@
-import setuptools
+"""Compatibility shim for tools that still invoke ``setup.py`` directly.
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+Package metadata and build configuration live in ``pyproject.toml``.
+"""
 
-setuptools.setup(
-    name="VotschTechnikClimateChamber",
-    version="0.2.0",
-    author="Original: Matias H. Senger, Fork: A. Chasnyk",
-    author_email="Original:m.senger@hotmail.com, Fork: alexandr.chansyk@gmai.com",
-    description="Python interface for Vötsch/Weiss Technik climate chambers with LabEvent controllers",
-    long_description=long_description,
-    long_description_content_type="text/markdown",
-    url="https://github.com/SengerM/VotschTechnik-climate-chamber-Python",
-    project_urls={
-        "Bug Tracker": "https://github.com/SengerM/VotschTechnik-climate-chamber-Python/issues",
-        "Documentation": "https://github.com/SengerM/VotschTechnik-climate-chamber-Python/wiki",
-    },
-    packages=setuptools.find_packages(),  # Removed src/ reference
-    python_requires=">=3.7",
+from setuptools import setup
 
-    entry_points={
-        "console_scripts": [
-            "votsch-cli=VotschTechnikClimateChamber.cli:main",
-        ],
-    },
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Science/Research",
-        "Intended Audience :: Manufacturing",
-        "Topic :: Scientific/Engineering :: Interface Engine/Protocol Translator",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Operating System :: OS Independent",
-        "Operating System :: Microsoft :: Windows",
-        "Operating System :: POSIX :: Linux",
-    ],
-    keywords="vötsch weiss climate chamber environmental test lab equipment",
-    license="MIT",  # Modern license specification
-    include_package_data=True,
-)
+
+if __name__ == "__main__":
+    setup()
