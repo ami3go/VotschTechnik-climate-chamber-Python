@@ -277,7 +277,7 @@ class ClimateChamber:
 		raw_response = self.query_command_low_level(command_number, *arguments)
 		# The protocol separates fields with 0xB6 and terminates with CR.
 		fields = raw_response.rstrip(b'\r\n').split(b'\xb6')
-		if len(fields) < 2 or fields[0] != b'1':
+		if not fields or fields[0] != b'1':
 			raise RuntimeError(
 			f'Chamber rejected or malformed command {command_name!r}: {raw_response!r}'
 		)

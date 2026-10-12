@@ -87,6 +87,11 @@ class CommandTests(unittest.TestCase):
         chamber._temp_round = 2
         return chamber
 
+    def test_status_only_success_response_is_valid(self):
+        chamber = self.new_chamber()
+        chamber.query_command_low_level = lambda *args: b"1\\r"
+        self.assertEqual(chamber.query("START MANUAL_MODE", 1, 0), [])
+
     def test_non_finite_and_boolean_rejected_before_io(self):
         chamber = self.new_chamber()
         chamber.query = lambda *args: self.fail("No hardware call expected")
