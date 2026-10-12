@@ -1,4 +1,6 @@
 import socket
+import math
+from .transport import connect_socket, exchange_frame
 from threading import RLock
 from colorama import Fore, Back, Style
 import time
@@ -173,18 +175,16 @@ def _validate_type(var, var_name, typ):
 		raise TypeError(f'<{var_name}> must be of type {typ}, received object of type {type(var)}.')
 
 def _validate_float(var, var_name):
-	"""Validates that `var` is a floating point like object (e.g. a string "3.14" is valid)."""
-	msg = f'Cannot interpret <{var_name}> as a float number, received object of type {type(var)}.'
+	"""Return a finite float; numeric strings remain supported."""
+	if isinstance(var, bool) or not isinstance(var, (int, float, str)):
+		raise TypeError(f"<{var_name}> must be a finite number or numeric string.")
 	try:
-		float(var)
-	except:
-		raise TypeError(msg)
-	try:
-		len(var)
-	except:
-		pass
-	else:
-		raise TypeError(msg)
+		value = float(var)
+	except (ValueError, TypeError, OverflowError) as exc:
+		raise ValueError(f"<{var_name}> is not a valid number.") from exc
+	if not math.isfinite(value):
+		raise ValueError(f"<{var_name}> must be finite.")
+	return value
 
 def create_command_string(command_number: str, *arguments):
 	"""Given the command number and a list of arguments, creates the 
@@ -210,6 +210,8 @@ def create_command_string(command_number: str, *arguments):
 	command_string = ''.encode('ascii')
 	separator_character = b'\xb6' # ASCII code 182, according to [2] page 5.
 	for element in [command_number, str(chamber_index)] + [str(arg) for arg in arguments]:
+		if any(marker in element for marker in ('\r', '\n', '\xb6')):
+			raise ValueError("Command argument contains a protocol delimiter.")
 		command_string += element.encode('ascii') + separator_character
 	command_string = command_string[:-1] + '\r'.encode('ascii')
 	return command_string
@@ -235,48 +237,51 @@ def translate_command_name_to_command_number(command_name: str):
 		raise ValueError(f'Invalid command "{command_name}". This is a list of all possible command names: {COMMANDS_LIST}.')
 	return str(command_number)
 
+class StopNotVerified(RuntimeError):
+	"""No positive evidence that a STOP attempt stopped the chamber."""
+
+
 class ClimateChamber:
 	def __init__(self, ip: str, temperature_min: float, temperature_max: float, timeout=1, temp_round = 2):
 		"""Creates an object of class ClimateChamber and starts the network connection to use it.
 		- ip: string, IP address of the climate chamber to control.
 		- temperature_min: float, minimum value of temperature to use. This is required for safety reasons to avoid accidentaly setting a temperature outside of this limit. This protection is implemented in this class, it does not touches anything into the climate chamber. If you use the methods provided by this class to control the temperature, everything should be fine. You can also set limits manually in the chamber itself using the control pannel.
 		- temperature_max: float, maximum value of temperature to use. See `temperature_min` description."""
-		_validate_float(temperature_min, 'temperature_min')
-		_validate_float(temperature_max, 'temperature_max')
-		self._temperature_min = float(temperature_min)
-		self._temperature_max = float(temperature_max)
+		self._temperature_min = _validate_float(temperature_min, 'temperature_min')
+		self._temperature_max = _validate_float(temperature_max, 'temperature_max')
+		if self._temperature_min >= self._temperature_max:
+			raise ValueError("temperature_min must be lower than temperature_max")
 		self._temp_round = int(temp_round)
 		_validate_type(ip, 'ip', str)
-		self._communication_lock = RLock() # To make a thread safe implementation.
-		with self._communication_lock:
-			self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			self.socket.connect((ip, 2049)) # According to [2] § 2.2 this is the port, always.
-			self.socket.settimeout(timeout)
+		self._timeout = _validate_float(timeout, 'timeout')
+		if self._timeout <= 0:
+			raise ValueError("timeout must be positive")
+		self._communication_lock = RLock()
+		self.socket = connect_socket(ip, 2049, self._timeout)
 
 
 	def disconnect(self):
-		self.socket.close()
+		with self._communication_lock:
+			self.socket.close()
 
 
 	def query_command_low_level(self, command_number, *arguments):
 		"""Given the command number and the arguments, the command string is created and sent to the climate chamber. The response from the chamber to that command is returned without any processing."""
 		string_to_send = create_command_string(str(command_number), *arguments)
 		with self._communication_lock:
-			self.socket.send(string_to_send)
-			response = self.socket.recv(512) # The example in [2] § 6, and also the code in [1], does this.
-		return response
+			return exchange_frame(self.socket, string_to_send, self._timeout)
 	
 	def query(self, command_name: str, *arguments):
 		"""Given a command name (e.g. 'SET CONTROL_VALUE SET_POINT', for all available command names see `VotschTechnikClimateChamber.ClimateChamber.COMMANDS_LIST`) and the arguments, the command is sent to the chamber. Returns a list with the data from the response from the climate chamber. This function checks if the command was successfully accepted and executed by the climate chamber, or if there was any kind of error reported by the chamber; in such a case a RuntimeError is raised."""
 		command_number = translate_command_name_to_command_number(command_name)
 		raw_response = self.query_command_low_level(command_number, *arguments)
-		separator_character = '¶'
-		response = raw_response.decode('utf-8', errors='backslashreplace').replace('\\xb6',separator_character).replace('\r\n','')
-		if 'read failed' in response.lower() or int(response.split(separator_character)[0]) != 1:
-			raise RuntimeError(f'Command "{command_name}" was sent to the climate chamber with arguments {arguments} and the climate chamber responded with an error code. I have no idea what happened, sorry. The raw response from the climate chamber is: {raw_response}.')
-		response = response.split(separator_character)
-		response = response[1:]
-		return response
+		# The protocol separates fields with 0xB6 and terminates with CR.
+		fields = raw_response.rstrip(b'\r\n').split(b'\xb6')
+		if not fields or fields[0] != b'1':
+			raise RuntimeError(
+			f'Chamber rejected or malformed command {command_name!r}: {raw_response!r}'
+		)
+		return [field.decode('utf-8', errors='replace') for field in fields[1:]]
 	
 	@property
 	def serial_number(self):
@@ -319,7 +324,7 @@ class ClimateChamber:
 	@temperature_set_point.setter
 	def temperature_set_point(self, celsius: float):
 		"""Set the temperature in Celsius."""
-		_validate_float(celsius, 'celsius')
+		celsius = _validate_float(celsius, 'celsius')
 		if not self._temperature_min <= celsius <= self._temperature_max:
 			raise ValueError(f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. These limits allow to set the temperature between {self._temperature_min} and {self._temperature_max} °C.')
 		else:
@@ -335,8 +340,10 @@ class ClimateChamber:
 	@temperature_min.setter
 	def temperature_min(self, celsius: float):
 		"""Set the minimum temperature limit in Celsius."""
-		_validate_float(celsius, 'celsius')
-		self._temperature_min = float(celsius)
+		celsius = _validate_float(celsius, 'celsius')
+		if celsius >= self._temperature_max:
+			raise ValueError("temperature_min must be lower than temperature_max")
+		self._temperature_min = celsius
 	
 	@property
 	def temperature_max(self):
@@ -347,8 +354,10 @@ class ClimateChamber:
 	@temperature_max.setter
 	def temperature_max(self, celsius: float):
 		"""Set the maximum temperature limit in Celsius."""
-		_validate_float(celsius, 'celsius')
-		self._temperature_max = float(celsius)
+		celsius = _validate_float(celsius, 'celsius')
+		if celsius <= self._temperature_min:
+			raise ValueError("temperature_max must exceed temperature_min")
+		self._temperature_max = celsius
 
 
 	@property
@@ -400,12 +409,31 @@ class ClimateChamber:
 			time.sleep(1)
 		
 	
-	def stop(self):
-		"""Stops the climate chamber."""
-		if self.is_running == True:
+	def stop(self, verify_timeout=3.0):
+		"""Attempt STOP regardless of prior status; require stopped readback.
+
+		A command/response failure is ambiguous: the chamber may still be
+		running, so callers must treat errors as UNKNOWN and intervene locally.
+		This method is NOT an emergency stop.
+		"""
+		verify_timeout = _validate_float(verify_timeout, 'verify_timeout')
+		if verify_timeout <= 0:
+			raise ValueError("verify_timeout must be positive")
+		try:
 			self.query('START MANUAL_MODE', 1, 0)
-			time.sleep(1)
-	
+		except Exception as exc:
+			raise StopNotVerified('STOP outcome unknown: command failed or reply lost') from exc
+		deadline = time.monotonic() + verify_timeout
+		while True:
+			try:
+				if self.is_running is False:
+					return
+			except Exception as exc:
+				raise StopNotVerified('STOP attempted but status readback failed') from exc
+			if time.monotonic() >= deadline:
+				raise StopNotVerified('STOP attempted but chamber still reports running')
+			time.sleep(min(0.1, max(0, deadline - time.monotonic())))
+
 	@property
 	def is_running(self):
 		"""Returns True if the climate chamber is running and False otherwise."""
@@ -424,7 +452,7 @@ class ClimateChamber:
 	@gradient_up.setter
 	def gradient_up(self, celsius: float):
 		"""Set the temperature in Celsius."""
-		_validate_float(celsius, 'celsius')
+		celsius = _validate_float(celsius, 'celsius')
 		min_val = 0.01
 		max_val = 5
 		if not min_val <= celsius <= max_val:
@@ -442,7 +470,7 @@ class ClimateChamber:
 	@gradient_down.setter
 	def gradient_down(self, celsius: float):
 		"""Set the temperature in Celsius."""
-		_validate_float(celsius, 'celsius')
+		celsius = _validate_float(celsius, 'celsius')
 		min_val = 0.01
 		max_val = 3.5
 		if not min_val <= celsius <= max_val:
