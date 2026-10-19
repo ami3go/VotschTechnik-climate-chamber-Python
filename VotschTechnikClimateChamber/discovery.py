@@ -118,5 +118,8 @@ def discover_chambers(network: str | None = None) -> list[DiscoveredChamber]:
             # Watchdog: return independently verified devices seen so far.
             pass
     finally:
-        pool.shutdown(wait=False, cancel_futures=True)
+        # Compatible with Python 3.7/3.8 (shutdown(cancel_futures) is 3.9+).
+        for future in futures:
+            future.cancel()
+        pool.shutdown(wait=False)
     return sorted(found, key=lambda item: int(ipaddress.IPv4Address(item.address)))
