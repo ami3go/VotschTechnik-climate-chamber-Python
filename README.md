@@ -55,3 +55,27 @@ print(f'The actual temperature in the chamber is {chamber.temperature_measured} 
 ## Reference
 
 Check the source code, specifically in [this file](VotschTechnikClimateChamber/ClimateChamber.py). If there is a specific method in the `ClimateChamber` class to do what you want, use it. Otherwise you will have to send the commands using the method `ClimateChamber.query`. The available commands are those in the `COMMANDS_DICT` which is defined in [the same file](VotschTechnikClimateChamber/ClimateChamber.py). If your command is not in `COMMANDS_DICT` you will have to use the method `ClimateChamber.query_command_low_level` and enter the command numbers manually, as stated in the user manual, which is a pain.
+
+## Discover compatible chambers (read-only)
+
+The administrator can discover compatible Vötsch/Weiss S!MPAC/LabEvent controllers
+on the **server's** local private IPv4 /24 networks, without issuing any
+control commands:
+
+```python
+from VotschTechnikClimateChamber.discovery import discover_chambers
+
+found = discover_chambers()                       # detected server-side private /24s
+# or discover_chambers("192.168.10.0/24")         # explicit approved local scope
+for item in found:
+    print(item.address, item.model, item.serial_number)
+```
+
+The scanner connects to TCP port **2049** with short timeouts and reads only
+`GET CHAMBER INFO` (model and serial) via the normal driver. It never starts,
+stops, modifies settings or authorizes operating a chamber. It is intentionally
+limited to RFC1918 /24 or narrower networks, at most 512 hosts, 16 concurrent
+probes and a 12-second watchdog. A timeout may return a partial list; no result
+does not prove a chamber absent. Run scans only on networks you manage and have
+permission to query. GUI users must separately save the chosen chamber,
+confirm a physical identity pin and comply with all HIL safety requirements.
