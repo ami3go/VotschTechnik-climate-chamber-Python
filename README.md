@@ -66,15 +66,16 @@ control commands:
 from VotschTechnikClimateChamber.discovery import discover_chambers
 
 found = discover_chambers()                       # detected server-side private /24s
-# or discover_chambers("192.168.10.0/24")         # explicit approved local scope
+# or discover_chambers("192.168.10.0/24")         # explicit approved local subnet
+# or discover_chambers("192.168.10.20")           # one chamber, longer timeout
 for item in found:
     print(item.address, item.model, item.serial_number)
 ```
 
-The scanner connects to TCP port **2049** with short timeouts and reads only
+The scanner connects to TCP port **2049** with bounded timeouts and reads only
 `GET CHAMBER INFO` (model and serial) via the normal driver. It never starts,
 stops, modifies settings or authorizes operating a chamber. It is intentionally
-limited to RFC1918 /24 or narrower networks, at most 512 hosts, 16 concurrent
+limited to RFC1918 /24 or narrower networks (or a single /32 IP), at most 512 hosts, 16 concurrent
 probes and a 12-second watchdog. A timeout may return a partial list; no result
 does not prove a chamber absent. Run scans only on networks you manage and have
 permission to query. GUI users must separately save the chosen chamber,

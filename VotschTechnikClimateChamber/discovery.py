@@ -20,6 +20,7 @@ MAX_HOSTS = 512
 MAX_WORKERS = 16
 MAX_SCAN_SECONDS = 12.0
 PROBE_TIMEOUT_SECONDS = 0.35
+DIRECT_PROBE_TIMEOUT_SECONDS = 2.0
 
 
 @dataclass(frozen=True)
@@ -29,11 +30,15 @@ class DiscoveredChamber:
     serial_number: str
 
 
+class DiscoveryProbeError(RuntimeError):
+    """A specific, user-actionable read-only identity failure at one IP."""
+
+
 def _safe_private_network(network):
     try:
         parsed = ipaddress.ip_network(network, strict=False)
     except ValueError as exc:
-        raise ValueError("Enter a valid private IPv4 CIDR (e.g. 192.168.1.0/24)") from exc
+        raise ValueError("Enter one private IPv4 address (e.g. 192.168.1.10) or CIDR (e.g. 192.168.1.0/24)") from exc
     if (not isinstance(parsed, ipaddress.IPv4Network)
             or parsed.prefixlen < 24
             or not any(parsed.subnet_of(allowed) for allowed in _RFC1918)):
@@ -66,38 +71,75 @@ def _automatic_networks():
     return tuple(sorted(networks, key=lambda item: (int(item.network_address), item.prefixlen)))
 
 
-def _probe(address: str, timeout_s: float):
-    """Only supported driver GET CHAMBER INFO queries; always close the socket."""
+def _probe(address: str, timeout_s: float, *, diagnostic: bool = False):
+    """Use only driver GET CHAMBER INFO, optionally describing an IP failure.
+
+    No write commands are sent. Scanning CIDRs remains quiet about each
+    non-device; single-host tests produce human-readable diagnostics.
+    """
     chamber = None
     try:
         chamber = ClimateChamber(address, 15.0, 35.0, timeout=timeout_s)
         model = str(chamber.test_system_type).strip()
         serial = str(chamber.serial_number).strip()
-        # Reject false-positive TCP listeners and identity values unusable by
-        # the GUI's existing fail-closed serial pin.
+        # Protect the existing serial-pin validation; an arbitrary open
+        # TCP listener must never be represented as a chamber.
         if not model or len(model) > 120 or not serial.isalnum() or len(serial) > 80:
+            if diagnostic:
+                raise DiscoveryProbeError(
+                    "Device responded on TCP 2049 but its model/serial identity "
+                    "is missing or not usable for the chamber serial pin.")
             return None
         return DiscoveredChamber(address, model, serial)
-    except (OSError, TimeoutError, ValueError, RuntimeError, IndexError, TypeError):
-        return None
+    except DiscoveryProbeError:
+        raise
+    except (socket.timeout, TimeoutError) as exc:
+        if diagnostic:
+            raise DiscoveryProbeError(
+                "TCP 2049 or the chamber identity reply timed out. Confirm the "
+                "server can reach this IP; the controller may be responding slowly.") from exc
+    except ConnectionRefusedError as exc:
+        if diagnostic:
+            raise DiscoveryProbeError(
+                "TCP 2049 connection refused. Check chamber network setup and "
+                "S!MPAC/SimServ TCP service.") from exc
+    except (ConnectionError, OSError) as exc:
+        if diagnostic:
+            raise DiscoveryProbeError(
+                "TCP 2049 connection failed or closed. Check network route, "
+                "firewall and controller communication settings.") from exc
+    except (RuntimeError, ValueError, IndexError, TypeError, UnicodeError) as exc:
+        if diagnostic:
+            raise DiscoveryProbeError(
+                "TCP 2049 connected, but the S!MPAC GET CHAMBER INFO "
+                "identity response was invalid or unavailable.") from exc
     finally:
         if chamber is not None:
             try:
                 chamber.disconnect()
             except OSError:
                 pass
-
+    return None
 
 def discover_chambers(network: str | None = None) -> list[DiscoveredChamber]:
-    """Scan a selected private subnet, or up to two local private /24 networks.
+    """Probe one private IP or scan a selected subnet/local private networks.
 
     Manual invocation only. Global 12s watchdog, 16 workers, per-operation
-    350ms socket timeout, 512 candidate limit. Incomplete scans return partial
+    350ms CIDR and 2s direct-IP socket timeout, 512 candidate limit.\n    Incomplete scans return partial
     results rather than keeping the GUI busy indefinitely. No public targets.
     """
-    networks = (_safe_private_network(network),) if network else _automatic_networks()
+    # A single IPv4 address is a /32: do not scan its whole /24 by accident.
+    # A longer timeout is justified when the operator knows the exact endpoint.
+    explicit = _safe_private_network(network) if network else None
+    if explicit is not None and explicit.prefixlen == 32:
+        host = str(explicit.network_address)
+        result = _probe(host, DIRECT_PROBE_TIMEOUT_SECONDS, diagnostic=True)
+        return [result] if result is not None else []
+    networks = (explicit,) if explicit is not None else _automatic_networks()
     if not networks:
-        raise ValueError("No private local IPv4 network found; enter a /24 CIDR manually")
+        raise ValueError(
+            "No private local IPv4 network found. Enter the chamber's private "
+            "IP or a private /24 subnet to search.")
     addresses = sorted({str(host) for subnet in networks for host in subnet.hosts()},
                        key=lambda value: int(ipaddress.IPv4Address(value)))
     if len(addresses) > MAX_HOSTS:
