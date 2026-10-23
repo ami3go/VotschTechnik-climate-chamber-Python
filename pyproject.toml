@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "VotschTechnikClimateChamber"
-version = "0.2.0"
+version = "0.3.0"
 description = "Python interface for Votsch/Weiss Technik climate chambers with LabEvent controllers"
 readme = "README.md"
 requires-python = ">=3.7"

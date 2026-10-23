@@ -170,6 +170,32 @@ COMMANDS_DICT = {
 }
 COMMANDS_LIST = _generate_list_of_all_possible_commands(COMMANDS_DICT)
 
+# Protocol-level sanity bound for numbered digital outputs. The authoritative
+# installed-output count is read from the device via
+# `ClimateChamber.number_of_digital_outputs`; do not infer it from this value.
+DIGITAL_OUTPUT_MAX = 64
+
+# Gradient ranges accepted by this driver. Values follow the S!MPAC simserv
+# manual (reference [2]) and remain subject to site/HIL verification.
+GRADIENT_UP_LIMITS_C_PER_MIN = (0.01, 5.0)
+GRADIENT_DOWN_LIMITS_C_PER_MIN = (0.01, 3.5)
+
+
+class DigitalOutputError(ValueError):
+	"""Invalid numbered digital output request or malformed capability reply."""
+
+
+class DigitalOutputReadbackError(RuntimeError):
+	"""The chamber did not report a boolean digital output state."""
+
+
+def _validate_output_number(number):
+	if type(number) is not int or not 1 <= number <= DIGITAL_OUTPUT_MAX:
+		raise DigitalOutputError(
+			f'<number> must be an int in 1..{DIGITAL_OUTPUT_MAX}, received {number!r}.')
+	return number
+
+
 def _validate_type(var, var_name, typ):
 	if not isinstance(var, typ):
 		raise TypeError(f'<{var_name}> must be of type {typ}, received object of type {type(var)}.')
@@ -363,21 +389,13 @@ class ClimateChamber:
 	@property
 	def dryer(self):
 		"""Returns either `True` or `False` depending on whether the status of the dryer is on or off."""
-		status = self.query('GET DIGITAL_OUT VALUE', 8)[0]
-		if status == '0':
-			return False
-		elif status == '1':
-			return True
-		else:
-			raise RuntimeError(f'Queried for dryer status to the climate chamber, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+		return self.read_digital_output(8)
 
 
 	@dryer.setter
 	def dryer(self, status: bool):
 		"""Turns on or off the dryer if status is True or False respectively."""
-		if status not in {True, False}:
-			raise ValueError(f'<status> must be either True or False, received {status}.')
-		self.query('SET DIGITAL_OUT VALUE', 8, 1 if status==True else 0)
+		self.set_digital_output(8, status)
 		time.sleep(1)
 	
 
@@ -385,23 +403,60 @@ class ClimateChamber:
 	@property
 	def compressed_air(self):
 		"""Returns either `True` or `False` depending on whether the status of the compressed air is on or off."""
-		status = self.query('GET DIGITAL_OUT VALUE', 7)[0]
-		if status == '0':
-			return False
-		elif status == '1':
-			return True
-		else:
-			raise RuntimeError(f'Queried for compressed air status to the climate chamber, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+		return self.read_digital_output(7)
 
 
 	@compressed_air.setter
 	def compressed_air(self, status: bool):
 		"""Turns on or off the compressed air if status is True or False respectively."""
-		if status not in {True, False}:
-			raise ValueError(f'<status> must be either True or False, received {status}.')
-		self.query('SET DIGITAL_OUT VALUE', 7, 1 if status==True else 0)
+		self.set_digital_output(7, status)
 		time.sleep(1)
-	
+
+	@property
+	def number_of_digital_outputs(self):
+		"""Number of digital outputs reported by the chamber (command 14007)."""
+		fields = self.query('GET DIGITAL_OUT NUMBER_OF')
+		value = fields[0] if fields else ''
+		try:
+			count = int(value)
+		except (TypeError, ValueError):
+			raise DigitalOutputError(
+				f'Chamber reported an invalid digital output count: {value!r}.') from None
+		if not 1 <= count <= DIGITAL_OUTPUT_MAX:
+			raise DigitalOutputError(
+				f'Chamber reported digital output count {count}, outside 1..{DIGITAL_OUTPUT_MAX}.')
+		return count
+
+	def digital_output_name(self, number: int) -> str:
+		"""Return the device-reported name of one numbered digital output."""
+		number = _validate_output_number(number)
+		fields = self.query('GET DIGITAL_OUT NAME', number)
+		name = fields[0].strip() if fields else ''
+		if not name:
+			raise DigitalOutputError(
+				f'Chamber reported no name for digital output {number}.')
+		return name
+
+	def read_digital_output(self, number: int) -> bool:
+		"""Return the verified boolean state of one numbered digital output."""
+		number = _validate_output_number(number)
+		fields = self.query('GET DIGITAL_OUT VALUE', number)
+		value = fields[0] if fields else ''
+		if value == '0':
+			return False
+		if value == '1':
+			return True
+		raise DigitalOutputReadbackError(
+			f'Digital output {number} readback was not boolean: {value!r}.')
+
+	def set_digital_output(self, number: int, state: bool) -> None:
+		"""Write one numbered digital output; the caller must verify readback."""
+		number = _validate_output_number(number)
+		if type(state) is not bool:
+			raise DigitalOutputError(
+				f'<state> must be a bool, received {state!r}.')
+		self.query('SET DIGITAL_OUT VALUE', number, 1 if state else 0)
+
 	def start(self):
 		"""Starts the climate chamber."""
 		if self.is_running == False:
@@ -437,49 +492,55 @@ class ClimateChamber:
 	@property
 	def is_running(self):
 		"""Returns True if the climate chamber is running and False otherwise."""
-		status = self.query('GET DIGITAL_OUT VALUE', 1)[0]
-		if status == '0':
-			return False
-		if status == '1':
-			return True
-		else:
-			raise RuntimeError(f'Queried the climate chamber to see if it was running, I was expecting the answer to be either 0 or 1 but received `{status}` which I dont know how to interpret...')
+		return self.read_digital_output(1)
 
 	@property
 	def gradient_up(self):
 		return float(self.query('GET GRADIENT_UP VALUE', 1)[0])
 
+	@property
+	def gradient_up_range(self):
+		"""(min, max) accepted by `gradient_up`, treated as °C/min per the manual.
+
+		The unit/range still requires site/HIL verification; this property is
+		read-only metadata and never mutates the chamber."""
+		return GRADIENT_UP_LIMITS_C_PER_MIN
+
 	@gradient_up.setter
 	def gradient_up(self, celsius: float):
-		"""Set the temperature in Celsius."""
+		"""Set the upward setpoint gradient in °C/min (manual-derived limits)."""
 		celsius = _validate_float(celsius, 'celsius')
-		min_val = 0.01
-		max_val = 5
+		min_val, max_val = GRADIENT_UP_LIMITS_C_PER_MIN
 		if not min_val <= celsius <= max_val:
 			raise ValueError(
-				f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. '
-				f'These limits allow to set the temperature between {min_val} and {max_val} °C.')
-		else:
-			self.query('SET GRADIENT_UP VALUE', 1,
-					   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
+				f'Trying to set the upward gradient to {celsius} °C/min which is outside the supported range '
+				f'{min_val}..{max_val} °C/min.')
+		self.query('SET GRADIENT_UP VALUE', 1,
+				   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
 
 	@property
 	def gradient_down(self):
 		return float(self.query('GET GRADIENT_DOWN VALUE', 1)[0])
 
+	@property
+	def gradient_down_range(self):
+		"""(min, max) accepted by `gradient_down`, treated as °C/min per the manual.
+
+		The unit/range still requires site/HIL verification; this property is
+		read-only metadata and never mutates the chamber."""
+		return GRADIENT_DOWN_LIMITS_C_PER_MIN
+
 	@gradient_down.setter
 	def gradient_down(self, celsius: float):
-		"""Set the temperature in Celsius."""
+		"""Set the downward setpoint gradient in °C/min (manual-derived limits)."""
 		celsius = _validate_float(celsius, 'celsius')
-		min_val = 0.01
-		max_val = 3.5
+		min_val, max_val = GRADIENT_DOWN_LIMITS_C_PER_MIN
 		if not min_val <= celsius <= max_val:
 			raise ValueError(
-				f'Trying to set temperature to {celsius} °C which is outside the temperature limits configured for this instance. '
-				f'These limits allow to set the temperature between {min_val} and {max_val} °C.')
-		else:
-			self.query('SET GRADIENT_DOWN VALUE', 1,
-					   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
+				f'Trying to set the downward gradient to {celsius} °C/min which is outside the supported range '
+				f'{min_val}..{max_val} °C/min.')
+		self.query('SET GRADIENT_DOWN VALUE', 1,
+				   str(celsius))  # This is based in an example for setting the temperature from [2] § 3.2.
 
 	def set_and_wait(self, tset=25, wait_after_min=0):
 		# set chamber to target temperatures
